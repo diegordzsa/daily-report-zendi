@@ -32,6 +32,7 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn }) {
   });
 
   const eur = (n) => `€${fmt(n)} ($${fmt(n * eurToMxn)} MXN)`;
+  const mxn = (n) => `$${fmt(n)} MXN`;
 
   const subscriptionLine = buildSubscriptionLine(metrics);
 
@@ -40,9 +41,9 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn }) {
     dateStr,
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
     ``,
-    `:moneybag: *REVENUE*`,
-    `  Net Sales (Shopify): ${eur(metrics.shopifyRevenue)}`,
-    `  Ordenes: ${metrics.shopifyOrders} | AOV: ${eur(metrics.shopifyAOV)}`,
+    `:moneybag: *REVENUE (Shopify)*`,
+    `  Net Sales: ${mxn(metrics.shopifyRevenue)}`,
+    `  Ordenes: ${metrics.shopifyOrders} | AOV: ${mxn(metrics.shopifyAOV)}`,
   ];
 
   if (subscriptionLine) {
