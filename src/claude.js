@@ -15,7 +15,7 @@ function buildRoasInstruction() {
   return '2. Si el ROAS es bueno, malo o normal para ecommerce DTC';
 }
 
-export async function generateDiagnosis(metrics) {
+export async function generateDiagnosis(metrics, eurToMxn) {
   const client = new Anthropic();
 
   const subscriptionBlock = buildSubscriptionLines(metrics);
@@ -38,10 +38,10 @@ METRICAS PAID (Meta Ads):
 - Checkout Rate: ${metrics.checkoutRate.toFixed(2)}%
 - Purchase Rate: ${metrics.purchaseRate.toFixed(2)}%
 
-METRICAS SHOPIFY (fuente de verdad, en MXN):
-- Revenue neto: $${metrics.shopifyRevenue.toFixed(2)} MXN
+METRICAS SHOPIFY (fuente de verdad):
+- Revenue neto: €${(metrics.shopifyRevenue / eurToMxn).toFixed(2)} ($${metrics.shopifyRevenue.toFixed(2)} MXN)
 - Ordenes reales: ${metrics.shopifyOrders}
-- AOV: $${metrics.shopifyAOV.toFixed(2)} MXN${subscriptionSection}
+- AOV: €${(metrics.shopifyAOV / eurToMxn).toFixed(2)} ($${metrics.shopifyAOV.toFixed(2)} MXN)${subscriptionSection}
 
 Identifica en 3-4 lineas:
 1. Cual es el punto mas debil del funnel hoy y por que

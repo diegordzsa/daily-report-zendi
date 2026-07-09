@@ -35,6 +35,7 @@ export const STORE_CURRENCY = optional('STORE_CURRENCY', '€');
 export const STORE_LOCALE = optional('STORE_LOCALE', 'es-ES');
 export const STORE_INDUSTRY = optional('STORE_INDUSTRY');
 export const ROAS_BENCHMARK = optional('ROAS_BENCHMARK');
+export const STORE_TIMEZONE = optional('STORE_TIMEZONE', 'America/Mexico_City');
 export const REPORT_TIME_LABEL = optional('REPORT_TIME_LABEL', '5:00 AM');
 export const META_API_VERSION = optional('META_API_VERSION', 'v21.0');
 export const SHOPIFY_API_VERSION = optional('SHOPIFY_API_VERSION', '2024-10');
