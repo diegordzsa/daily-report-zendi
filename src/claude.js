@@ -39,9 +39,9 @@ METRICAS PAID (Meta Ads):
 - Purchase Rate: ${metrics.purchaseRate.toFixed(2)}%
 
 METRICAS SHOPIFY (fuente de verdad):
-- Revenue neto: €${(metrics.shopifyRevenue / eurToMxn).toFixed(2)} ($${metrics.shopifyRevenue.toFixed(2)} MXN)
+- Revenue neto: €${(metrics.shopifyRevenue / eurToMxn).toFixed(2)}
 - Ordenes reales: ${metrics.shopifyOrders}
-- AOV: €${(metrics.shopifyAOV / eurToMxn).toFixed(2)} ($${metrics.shopifyAOV.toFixed(2)} MXN)${subscriptionSection}
+- AOV: €${(metrics.shopifyAOV / eurToMxn).toFixed(2)}${subscriptionSection}
 
 Identifica en 3-4 lineas:
 1. Cual es el punto mas debil del funnel hoy y por que

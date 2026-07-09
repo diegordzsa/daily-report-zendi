@@ -31,8 +31,8 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn }) {
     day: 'numeric', month: 'long', year: 'numeric',
   });
 
-  const eur = (n) => `€${fmt(n)} ($${fmt(n * eurToMxn)} MXN)`;
-  const fromMxn = (n) => `€${fmt(n / eurToMxn)} ($${fmt(n)} MXN)`;
+  const eur = (n) => `€${fmt(n)}`;
+  const fromMxn = (n) => `€${fmt(n / eurToMxn)}`;
 
   const subscriptionLine = buildSubscriptionLine(metrics);
 
