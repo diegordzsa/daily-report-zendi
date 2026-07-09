@@ -12,12 +12,17 @@ export async function fetchShopifyOrders(accessToken) {
 
   const yesterday = getYesterday();
 
+  const dayBefore = new Date(yesterday + 'T12:00:00');
+  dayBefore.setDate(dayBefore.getDate() - 1);
+  const dayAfter = new Date(yesterday + 'T12:00:00');
+  dayAfter.setDate(dayAfter.getDate() + 1);
+
   const params = new URLSearchParams({
     status: 'any',
-    created_at_min: `${yesterday}T00:00:00`,
-    created_at_max: `${yesterday}T23:59:59`,
+    created_at_min: `${dayBefore.toISOString().slice(0, 10)}T00:00:00`,
+    created_at_max: `${dayAfter.toISOString().slice(0, 10)}T23:59:59`,
     limit: '250',
-    fields: 'id,created_at,subtotal_price,total_discounts,tags,line_items',
+    fields: 'id,created_at,total_price,subtotal_price,total_discounts,total_tax,tags,line_items',
   });
 
   const allOrders = [];
@@ -42,15 +47,19 @@ export async function fetchShopifyOrders(accessToken) {
     url = next ? next[1] : null;
   }
 
-  console.log(`[Shopify] Got ${allOrders.length} total orders`);
+  console.log(`[Shopify] Got ${allOrders.length} total orders (3-day window)`);
 
   const yesterdayOrders = allOrders.filter(o => o.created_at?.slice(0, 10) === yesterday);
   console.log(`[Shopify] ${yesterdayOrders.length} orders for ${yesterday}`);
 
-  return yesterdayOrders.map(order => ({
-    date: yesterday,
-    order_count: 1,
-    order_net_sales: parseFloat(order.subtotal_price) || 0,
-    order_tags: order.tags || '',
-  }));
+  return yesterdayOrders.map(order => {
+    const subtotal = parseFloat(order.subtotal_price) || 0;
+    const tax = parseFloat(order.total_tax) || 0;
+    return {
+      date: yesterday,
+      order_count: 1,
+      order_net_sales: subtotal + tax,
+      order_tags: order.tags || '',
+    };
+  });
 }
