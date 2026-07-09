@@ -6,29 +6,7 @@ export function getYesterday() {
   return d.toISOString().slice(0, 10);
 }
 
-async function getAccessToken(clientId, clientSecret) {
-  const res = await fetch(`https://${SHOPIFY_STORE_DOMAIN}/admin/oauth/access_token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: 'client_credentials',
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Shopify token exchange failed: ${res.status} ${res.statusText} — ${body.substring(0, 200)}`);
-  }
-
-  const json = await res.json();
-  return json.access_token;
-}
-
-export async function fetchShopifyOrders(clientId, clientSecret) {
-  const accessToken = await getAccessToken(clientId, clientSecret);
-  console.log(`[Shopify] Access token obtained`);
+export async function fetchShopifyOrders(accessToken) {
 
   const yesterday = getYesterday();
   const twoDaysAgo = new Date(yesterday);

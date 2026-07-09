@@ -3,8 +3,8 @@ import { fetchMetaAds } from './meta.js';
 import { generateDiagnosis } from './claude.js';
 import { sendToSlack, formatReport } from './slack.js';
 import {
-  STORE_NAME, META_ACCESS_TOKEN, SHOPIFY_CLIENT_ID,
-  SHOPIFY_CLIENT_SECRET, SLACK_WEBHOOK_URL, SUBSCRIPTION_TAGS,
+  STORE_NAME, META_ACCESS_TOKEN, SHOPIFY_ACCESS_TOKEN,
+  SLACK_WEBHOOK_URL, SUBSCRIPTION_TAGS,
 } from './config.js';
 
 async function fetchEurToMxn() {
@@ -24,7 +24,7 @@ async function run() {
   try {
     [metaData, shopifyData] = await Promise.all([
       fetchMetaAds(META_ACCESS_TOKEN),
-      fetchShopifyOrders(SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET),
+      fetchShopifyOrders(SHOPIFY_ACCESS_TOKEN),
     ]);
   } catch (err) {
     console.error('API fetch failed:', err.message);
