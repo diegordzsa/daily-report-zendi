@@ -10,9 +10,9 @@ function buildSubscriptionLines(metrics) {
 
 function buildRoasInstruction() {
   if (STORE_INDUSTRY && ROAS_BENCHMARK) {
-    return `2. Si el ROAS es bueno, malo o normal para un DTC de ${STORE_INDUSTRY} (benchmark: ${ROAS_BENCHMARK})`;
+    return `2. Compara el ROAS Meta vs MER-ROAS — si hay discrepancia grande, que significa. Evalua si el MER-ROAS es bueno para un DTC de ${STORE_INDUSTRY} (benchmark: ${ROAS_BENCHMARK})`;
   }
-  return '2. Si el ROAS es bueno, malo o normal para ecommerce DTC';
+  return '2. Compara el ROAS Meta vs MER-ROAS — si hay discrepancia grande, que significa. Evalua si el MER-ROAS es bueno para ecommerce DTC';
 }
 
 export async function generateDiagnosis(metrics, eurToMxn) {
@@ -33,6 +33,7 @@ METRICAS PAID (Meta Ads):
 - Checkouts Iniciados: ${metrics.checkoutsInitiated}
 - Compras (atribuidas Meta): ${metrics.metaOrders}
 - ROAS Meta: ${metrics.metaROAS.toFixed(2)}x
+- MER-ROAS (Shopify revenue / ad spend): ${metrics.merROAS.toFixed(2)}x
 - CTR: ${metrics.ctr.toFixed(2)}%
 - Add to Cart Rate: ${metrics.addToCartRate.toFixed(2)}%
 - Checkout Rate: ${metrics.checkoutRate.toFixed(2)}%

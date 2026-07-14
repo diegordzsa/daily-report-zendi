@@ -54,7 +54,7 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn }) {
     ``,
     `:loudspeaker: *PAID ADS (Meta)*`,
     `  Gasto: ${eur(metrics.adSpend)}`,
-    `  ROAS: ${metrics.metaROAS.toFixed(2)}x | CPO: ${eur(metrics.cpo)}`,
+    `  ROAS: ${metrics.metaROAS.toFixed(2)}x | MER-ROAS: ${metrics.merROAS.toFixed(2)}x | CPO: ${eur(metrics.cpo)}`,
     `  Revenue atribuido: ${eur(metrics.metaAttributedRevenue)}`,
     ``,
     `:mag: *FUNNEL*`,

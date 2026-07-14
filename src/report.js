@@ -107,6 +107,7 @@ function calculateMetrics(metaRows, shopifyRows) {
   const shopifyRevenue = sum(shopifyRows, 'order_net_sales');
   const shopifyOrders = sum(shopifyRows, 'order_count');
   const shopifyAOV = shopifyOrders > 0 ? shopifyRevenue / shopifyOrders : 0;
+  const merROAS = adSpend > 0 ? shopifyRevenue / adSpend : 0;
 
   const orderRows = shopifyRows.filter(r => Number(r.order_count) > 0);
   const subscriptionCounts = SUBSCRIPTION_TAGS.map(({ tag, label }) => ({
@@ -118,7 +119,7 @@ function calculateMetrics(metaRows, shopifyRows) {
     adSpend, impressions, clicks, linkClicks, addToCarts,
     checkoutsInitiated, metaOrders, metaAttributedRevenue,
     metaROAS, cpo, ctr, addToCartRate, checkoutRate, purchaseRate,
-    shopifyRevenue, shopifyOrders, shopifyAOV,
+    shopifyRevenue, shopifyOrders, shopifyAOV, merROAS,
     subscriptionCounts,
   };
 }
