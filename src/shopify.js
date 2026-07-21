@@ -1,10 +1,9 @@
-import { SHOPIFY_STORE_DOMAIN, SHOPIFY_API_VERSION, STORE_TIMEZONE } from './config.js';
+import { SHOPIFY_STORE_DOMAIN, SHOPIFY_API_VERSION } from './config.js';
 
 export function getYesterday() {
+  if (process.env.REPORT_DATE) return process.env.REPORT_DATE;
   const now = new Date();
-  const todayLocal = now.toLocaleDateString('en-CA', { timeZone: STORE_TIMEZONE });
-  const d = new Date(todayLocal + 'T12:00:00');
-  d.setDate(d.getDate() - 1);
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1));
   return d.toISOString().slice(0, 10);
 }
 

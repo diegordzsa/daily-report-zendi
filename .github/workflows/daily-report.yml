@@ -8,6 +8,10 @@ on:
     #   '0 13 * * *' = 13:00 UTC = 8:00 EST (Nueva York invierno)
     - cron: '0 3 * * *'
   workflow_dispatch:
+    inputs:
+      report_date:
+        description: 'Override report date (YYYY-MM-DD). Leave empty for yesterday.'
+        required: false
 
 jobs:
   report:
@@ -39,4 +43,5 @@ jobs:
           STORE_INDUSTRY: 'suplementos DTC'
           ROAS_BENCHMARK: '2.0x-4.0x'
           SUBSCRIPTION_TAGS: '[{"tag":"Kaching Subscription First Order","label":"1ª Susc"},{"tag":"Kaching Subscription Recurring Order","label":"Recurrentes"}]'
+          REPORT_DATE: ${{ github.event.inputs.report_date }}
         run: node src/report.js

@@ -19,11 +19,12 @@ async function fetchEurToMxn() {
 }
 
 async function run() {
+  const yesterday = getYesterday();
   let metaData, shopifyData;
 
   try {
     [metaData, shopifyData] = await Promise.all([
-      fetchMetaAds(META_ACCESS_TOKEN),
+      fetchMetaAds(META_ACCESS_TOKEN, yesterday),
       fetchShopifyOrders(SHOPIFY_ACCESS_TOKEN),
     ]);
   } catch (err) {
@@ -33,8 +34,6 @@ async function run() {
     );
     process.exit(1);
   }
-
-  const yesterday = getYesterday();
 
   console.log(`[Debug] Yesterday: ${yesterday}`);
   console.log(`[Debug] Meta rows: ${metaData.length}, Shopify rows: ${shopifyData.length}`);
