@@ -7,14 +7,17 @@ import {
   SLACK_WEBHOOK_URL, SUBSCRIPTION_TAGS,
 } from './config.js';
 
-async function fetchEurToMxn() {
+async function fetchExchangeRates() {
   try {
     const res = await fetch('https://open.er-api.com/v6/latest/EUR');
     const json = await res.json();
-    return json.rates?.MXN || 19.97;
+    return {
+      mxn: json.rates?.MXN || 19.97,
+      usd: json.rates?.USD || 1.08,
+    };
   } catch {
-    console.warn('[FX] Could not fetch live EUR→MXN rate, using fallback');
-    return 19.97;
+    console.warn('[FX] Could not fetch live exchange rates, using fallback');
+    return { mxn: 19.97, usd: 1.08 };
   }
 }
 
@@ -47,8 +50,9 @@ async function run() {
   }
 
   const metrics = calculateMetrics(metaData, shopifyData);
-  const eurToMxn = await fetchEurToMxn();
-  console.log(`[FX] EUR→MXN rate: ${eurToMxn}`);
+  const { mxn: eurToMxn, usd: eurToUsd } = await fetchExchangeRates();
+  console.log(`[FX] EUR→MXN rate: ${eurToMxn}, EUR→USD rate: ${eurToUsd}`);
+  const adSpendUSD = metrics.adSpend * eurToUsd;
 
   const subDebug = metrics.subscriptionCounts.map(s => `${s.label}: ${s.count}`).join(', ');
   console.log(`[Debug] Orders: ${metrics.shopifyOrders}, Net Sales: ${metrics.shopifyRevenue.toFixed(2)}${subDebug ? `, ${subDebug}` : ''}`);
@@ -66,6 +70,7 @@ async function run() {
     metrics,
     diagnosis,
     eurToMxn,
+    adSpendUSD,
   });
 
   try {

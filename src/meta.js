@@ -55,6 +55,11 @@ export async function fetchMetaAds(accessToken, date) {
   const data = json.data || [];
   console.log(`[Meta] Got ${data.length} rows`);
 
+  if (data.length > 0) {
+    const rawSpend = data.reduce((s, r) => s + (parseFloat(r.spend) || 0), 0);
+    console.log(`[Meta] Raw spend for ${date}: ${rawSpend.toFixed(2)}`);
+  }
+
   if (data.length === 0) return [];
 
   return data.map(row => ({

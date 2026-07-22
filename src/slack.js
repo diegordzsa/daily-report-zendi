@@ -25,7 +25,7 @@ function buildSubscriptionLine(metrics) {
   return `  ${parts.join(' | ')}`;
 }
 
-export function formatReport({ date, metrics, diagnosis, eurToMxn }) {
+export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD }) {
   const d = new Date(date);
   const dateStr = d.toLocaleDateString(STORE_LOCALE, {
     day: 'numeric', month: 'long', year: 'numeric',
@@ -53,7 +53,7 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn }) {
   lines.push(
     ``,
     `:loudspeaker: *PAID ADS (Meta)*`,
-    `  Gasto: ${eur(metrics.adSpend)}`,
+    `  Gasto: ${eur(metrics.adSpend)}${adSpendUSD ? ` ($${fmt(adSpendUSD)})` : ''}`,
     `  ROAS: ${metrics.metaROAS.toFixed(2)}x | MER-ROAS: ${metrics.merROAS.toFixed(2)}x | CPO: ${eur(metrics.cpo)}`,
     `  Revenue atribuido: ${eur(metrics.metaAttributedRevenue)}`,
     ``,
