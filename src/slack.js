@@ -42,8 +42,8 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD })
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
     ``,
     `:moneybag: *REVENUE (Shopify)*`,
-    `  Net Sales: ${fromMxn(metrics.shopifyRevenue)}`,
-    `  Ordenes: ${metrics.shopifyOrders} | AOV: ${fromMxn(metrics.shopifyAOV)}`,
+    `  Net Sales: ${fromMxn(metrics.shopifyRevenue)} ($${fmt(metrics.shopifyRevenue)} MXN)`,
+    `  Ordenes: ${metrics.shopifyOrders} | AOV: ${fromMxn(metrics.shopifyAOV)} ($${fmt(metrics.shopifyAOV)} MXN)`,
   ];
 
   if (subscriptionLine) {
@@ -53,7 +53,7 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD })
   lines.push(
     ``,
     `:loudspeaker: *PAID ADS (Meta)*`,
-    `  Gasto: ${eur(metrics.adSpend)}${adSpendUSD ? ` ($${fmt(adSpendUSD)})` : ''}`,
+    `  Gasto: ${eur(metrics.adSpend)}${adSpendUSD ? ` ($${fmt(adSpendUSD)} USD)` : ''}`,
     `  ROAS: ${metrics.metaROAS.toFixed(2)}x | MER-ROAS: ${metrics.merROAS.toFixed(2)}x | CPO: ${eur(metrics.cpo)}`,
     `  Revenue atribuido: ${eur(metrics.metaAttributedRevenue)}`,
     ``,
