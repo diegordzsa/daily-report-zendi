@@ -1,0 +1,37 @@
+name: Meta Diagnostic
+
+# Diagnostico temporal — NO envia nada a Slack, solo lee y loguea.
+# Objetivo: conocer la timezone de la cuenta publicitaria para decidir
+# a que hora se puede ejecutar el reporte sin comprometer el spend.
+# Borrar este archivo una vez obtenida la respuesta.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    env:
+      META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+      META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
+    steps:
+      - name: Ad account timezone and currency
+        run: |
+          echo "Hora UTC de esta ejecucion: $(date -u)"
+          curl -s -G "https://graph.facebook.com/v21.0/act_${META_AD_ACCOUNT_ID}" \
+            --data-urlencode "access_token=${META_ACCESS_TOKEN}" \
+            --data-urlencode "fields=name,timezone_name,timezone_offset_hours_utc,currency" \
+            | jq .
+
+      - name: Daily spend, last 6 days (valores ya consolidados)
+        run: |
+          SINCE=$(date -u -d '6 days ago' +%F)
+          UNTIL=$(date -u -d 'yesterday' +%F)
+          echo "Rango: $SINCE .. $UNTIL"
+          curl -s -G "https://graph.facebook.com/v21.0/act_${META_AD_ACCOUNT_ID}/insights" \
+            --data-urlencode "access_token=${META_ACCESS_TOKEN}" \
+            --data-urlencode "time_range={\"since\":\"${SINCE}\",\"until\":\"${UNTIL}\"}" \
+            --data-urlencode "time_increment=1" \
+            --data-urlencode "level=account" \
+            --data-urlencode "fields=spend,impressions,clicks" \
+            | jq '.data[] | {date: .date_start, spend, impressions, clicks}'
