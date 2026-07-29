@@ -1,12 +1,10 @@
 name: Daily Report
 
+# El disparo lo hace un cron externo (cron-job.org) via workflow_dispatch, no el
+# scheduler de GitHub: sus crons se retrasan entre 2 h y 3 h 45 min de forma
+# impredecible, y ese jitter movia la hora de entrega y la frescura del dato de
+# Meta cada dia. Ver SETUP.md > "Disparo externo".
 on:
-  schedule:
-    # Hora UTC — Meta necesita 6-12 h para finalizar spend del día anterior.
-    #   '0 7 * * *'  = 7:00 UTC = 9:00 CEST (Madrid verano) / 8:00 CET (invierno)
-    #   '0 12 * * *' = 12:00 UTC = 7:00 CDT (Mexico verano)
-    #   '0 13 * * *' = 13:00 UTC = 8:00 EST (Nueva York invierno)
-    - cron: '0 7 * * *'
   workflow_dispatch:
     inputs:
       report_date:
@@ -39,6 +37,12 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
           # --- Opcionales ---
+          # La cuenta de Meta (Zendi MX 1) cierra el dia a las 00:00 America/Mexico_City
+          # = 06:00 UTC = 08:00 Madrid. Por debajo de MIN_HOURS_AFTER_CLOSE el gasto
+          # todavia no esta consolidado y el reporte no se publica.
+          META_ACCOUNT_TIMEZONE: 'America/Mexico_City'
+          MIN_HOURS_AFTER_CLOSE: '3'
+          REPORT_TIME_LABEL: '11:00 (Madrid)'
           STORE_LOCALE: 'es-MX'
           STORE_INDUSTRY: 'suplementos DTC'
           ROAS_BENCHMARK: '2.0x-4.0x'

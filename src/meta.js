@@ -27,6 +27,30 @@ function extractActions(actionsArray, map) {
   return result;
 }
 
+// Timezone de la cuenta publicitaria. Define cuando cierra el dia para Meta,
+// que es lo que determina si el gasto ya esta consolidado.
+// Devuelve null si no se pudo leer, para que el llamador use su fallback.
+export async function fetchAdAccountTimezone(accessToken) {
+  const params = new URLSearchParams({
+    access_token: accessToken,
+    fields: 'timezone_name',
+  });
+  const url = `https://graph.facebook.com/${META_API_VERSION}/act_${META_AD_ACCOUNT_ID}?${params}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn(`[Meta] No se pudo leer la timezone de la cuenta: ${res.status}`);
+      return null;
+    }
+    const json = await res.json();
+    return json.timezone_name || null;
+  } catch (err) {
+    console.warn(`[Meta] No se pudo leer la timezone de la cuenta: ${err.message}`);
+    return null;
+  }
+}
+
 export async function fetchMetaAds(accessToken, date) {
   const fields = 'spend,impressions,clicks,actions,action_values,cpc,cpm,ctr,frequency';
   const params = new URLSearchParams({

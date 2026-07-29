@@ -1,10 +1,12 @@
 import { fetchShopifyOrders, getYesterday } from './shopify.js';
-import { fetchMetaAds } from './meta.js';
+import { fetchMetaAds, fetchAdAccountTimezone } from './meta.js';
+import { hoursSinceDayClose } from './freshness.js';
 import { generateDiagnosis } from './claude.js';
 import { sendToSlack, formatReport } from './slack.js';
 import {
   STORE_NAME, META_ACCESS_TOKEN, SHOPIFY_ACCESS_TOKEN,
   SLACK_WEBHOOK_URL, SUBSCRIPTION_TAGS,
+  META_ACCOUNT_TIMEZONE, MIN_HOURS_AFTER_CLOSE,
 } from './config.js';
 
 async function fetchExchangeRates() {
@@ -21,8 +23,37 @@ async function fetchExchangeRates() {
   }
 }
 
+// Meta sigue agregando gasto durante horas despues de que cierra el dia en la
+// timezone de la cuenta. Publicar antes de tiempo subestima el spend, lo que
+// infla ROAS y MER. Preferimos no publicar a publicar cifras incorrectas.
+async function assertMetaDataIsSettled(reportDate) {
+  const timeZone = await fetchAdAccountTimezone(META_ACCESS_TOKEN) || META_ACCOUNT_TIMEZONE;
+  const hours = hoursSinceDayClose(reportDate, timeZone);
+
+  console.log(
+    `[Freshness] ${reportDate} cerro hace ${hours.toFixed(2)} h en ${timeZone} ` +
+    `(minimo requerido: ${MIN_HOURS_AFTER_CLOSE} h)`
+  );
+
+  if (hours >= MIN_HOURS_AFTER_CLOSE) return { timeZone, hours };
+
+  const reason = hours < 0
+    ? `el dia todavia no termina en ${timeZone} (faltan ${(-hours).toFixed(1)} h)`
+    : `solo han pasado ${hours.toFixed(1)} h desde el cierre, el minimo es ${MIN_HOURS_AFTER_CLOSE} h`;
+
+  console.error(`Datos de Meta sin consolidar: ${reason}`);
+  await sendToSlack(SLACK_WEBHOOK_URL,
+    `:hourglass_flowing_sand: *${STORE_NAME} — Reporte Diario NO publicado*\n${reportDate}\n\n` +
+    `Meta aun no consolida el gasto: ${reason}.\n` +
+    `No se publica el reporte para no dar cifras incorrectas ` +
+    `(un gasto subestimado infla ROAS y MER).`
+  );
+  process.exit(1);
+}
+
 async function run() {
   const yesterday = getYesterday();
+  const { hours: hoursSettled } = await assertMetaDataIsSettled(yesterday);
   let metaData, shopifyData;
 
   try {
@@ -71,6 +102,7 @@ async function run() {
     diagnosis,
     eurToMxn,
     adSpendUSD,
+    hoursSettled,
   });
 
   try {

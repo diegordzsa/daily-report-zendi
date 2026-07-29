@@ -127,23 +127,52 @@ Si no defines `SUBSCRIPTION_TAGS` o lo dejas vacio, las metricas de suscripcion 
 
 ---
 
-## Timezone y Cron
+## Disparo externo
 
-El cron de GitHub Actions usa UTC. Ajusta la expresion segun tu zona horaria:
+El workflow **no usa el scheduler de GitHub**. Medido sobre 25 ejecuciones, los
+crons de GitHub Actions arrancaron entre **2 h 01 min y 3 h 44 min tarde**, sin
+patron. Ese jitter movia la hora de entrega (11:00-12:44 en Madrid con un cron
+puesto para las 9:00) y, peor, cambiaba cada dia cuanto llevaba consolidado el
+gasto de Meta.
 
-| Hora local deseada | Timezone | Cron UTC |
-|---|---|---|
-| 5:00 AM | Madrid (CEST, verano) | `0 3 * * *` |
-| 5:00 AM | Madrid (CET, invierno) | `0 4 * * *` |
-| 7:00 AM | Mexico City (CDT, verano) | `0 12 * * *` |
-| 7:00 AM | Mexico City (CST, invierno) | `0 13 * * *` |
-| 8:00 AM | Nueva York (EDT, verano) | `0 12 * * *` |
-| 8:00 AM | Nueva York (EST, invierno) | `0 13 * * *` |
-| 9:00 AM | Buenos Aires (ART) | `0 12 * * *` |
+En su lugar, un cron externo (cron-job.org) llama a la API de GitHub, que
+arranca el job al instante:
 
-Edita la linea `cron:` en `.github/workflows/daily-report.yml`.
+```
+POST https://api.github.com/repos/<owner>/<repo>/actions/workflows/daily-report.yml/dispatches
+Authorization: Bearer <PAT con permiso Actions: read and write>
+Accept: application/vnd.github+json
+X-GitHub-Api-Version: 2022-11-28
 
-> **Nota:** GitHub Actions puede tener un retraso de hasta 15 minutos en los cron jobs.
+{"ref":"main"}
+```
+
+Horario actual: **09:00 UTC = 11:00 Madrid**.
+
+### Por que no antes
+
+La cuenta de Meta esta en `America/Mexico_City` (UTC-6, sin horario de verano).
+El dia cierra a las **00:00 Mexico = 06:00 UTC = 08:00 Madrid**, y Meta sigue
+agregando gasto durante horas despues.
+
+Medido, comparando lo que reporto cada ejecucion contra el valor ya consolidado:
+a 3-4.7 h del cierre el gasto sale **0.2-0.7 % por debajo** del real, y no mejora
+dentro de esa franja. Mas temprano no esta medido y cae en la parte empinada de
+la curva. Un gasto subestimado **infla ROAS y MER**.
+
+Por eso 09:00 UTC (3 h post-cierre) es el limite razonable actual. Para bajarlo
+hay que medirlo antes con el workflow `meta-freshness-probe.yml`.
+
+### Guard de frescura
+
+`report.js` comprueba, antes de publicar, cuantas horas lleva cerrado el dia en
+la timezone real de la cuenta (leida de la API de Meta, con
+`META_ACCOUNT_TIMEZONE` como fallback). Si no llega a `MIN_HOURS_AFTER_CLOSE`
+(por defecto 3), **no publica el reporte**: manda un aviso a Slack y termina en
+error. Es preferible no tener reporte a tener uno con cifras incorrectas.
+
+> **Nota:** al no haber cron en GitHub, si el disparador externo falla no hay
+> reporte ese dia. cron-job.org avisa por email cuando una ejecucion falla.
 
 ---
 

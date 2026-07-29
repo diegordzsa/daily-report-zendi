@@ -1,0 +1,40 @@
+name: Meta Freshness Probe
+
+# Mide cuanto gasto le falta consolidar a Meta a horas mas tempranas que la del
+# reporte, para saber si se puede adelantar la entrega sin perder precision.
+# Solo lee y loguea: NO envia nada a Slack y NO afecta al reporte diario.
+#
+# Lo dispara cron-job.org a las 07:00 y 08:00 UTC (09:00 y 10:00 Madrid).
+# Tras ~5 dias, comparar cada muestra contra el valor ya consolidado con:
+#   gh run list --workflow=meta-freshness-probe.yml --limit 20
+#   gh run view <id> --log
+# Borrar este workflow cuando la decision este tomada.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+      META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
+    steps:
+      - name: Muestra de spend para el dia anterior
+        run: |
+          # La cuenta cierra el dia a las 00:00 America/Mexico_City = 06:00 UTC.
+          YESTERDAY=$(date -u -d 'yesterday' +%F)
+          NOW_EPOCH=$(date -u +%s)
+          CLOSE_EPOCH=$(date -u -d "$(date -u +%F) 06:00:00" +%s)
+          HOURS=$(awk "BEGIN { printf \"%.2f\", ($NOW_EPOCH - $CLOSE_EPOCH) / 3600 }")
+
+          echo "Muestra tomada: $(date -u)"
+          echo "Dia reportado:  ${YESTERDAY}"
+          echo "Horas desde el cierre del dia en hora de la cuenta: ${HOURS}"
+
+          curl -s -G "https://graph.facebook.com/v21.0/act_${META_AD_ACCOUNT_ID}/insights" \
+            --data-urlencode "access_token=${META_ACCESS_TOKEN}" \
+            --data-urlencode "time_range={\"since\":\"${YESTERDAY}\",\"until\":\"${YESTERDAY}\"}" \
+            --data-urlencode "level=account" \
+            --data-urlencode "fields=spend,impressions,clicks" \
+            | jq '.data[] | {date: .date_start, spend, impressions, clicks}'

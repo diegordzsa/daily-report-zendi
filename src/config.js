@@ -11,6 +11,17 @@ function optional(name, defaultValue = '') {
   return process.env[name] || defaultValue;
 }
 
+function optionalNumber(name, defaultValue) {
+  const raw = process.env[name];
+  if (!raw) return defaultValue;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    console.error(`${name} no es un numero valido ("${raw}") — usando ${defaultValue}`);
+    return defaultValue;
+  }
+  return parsed;
+}
+
 function parseSubscriptionTags(raw) {
   if (!raw) return [];
   try {
@@ -36,6 +47,12 @@ export const STORE_LOCALE = optional('STORE_LOCALE', 'es-ES');
 export const STORE_INDUSTRY = optional('STORE_INDUSTRY');
 export const ROAS_BENCHMARK = optional('ROAS_BENCHMARK');
 export const STORE_TIMEZONE = optional('STORE_TIMEZONE', 'America/Mexico_City');
+
+// Fallback si la API de Meta no devuelve la timezone de la cuenta.
+export const META_ACCOUNT_TIMEZONE = optional('META_ACCOUNT_TIMEZONE', 'America/Mexico_City');
+// Horas minimas desde el cierre del dia (en hora de la cuenta) para publicar.
+// Por debajo de este umbral Meta aun agrega gasto y el reporte lo subestimaria.
+export const MIN_HOURS_AFTER_CLOSE = optionalNumber('MIN_HOURS_AFTER_CLOSE', 3);
 export const REPORT_TIME_LABEL = optional('REPORT_TIME_LABEL', '9:00 AM');
 export const META_API_VERSION = optional('META_API_VERSION', 'v21.0');
 export const SHOPIFY_API_VERSION = optional('SHOPIFY_API_VERSION', '2024-10');

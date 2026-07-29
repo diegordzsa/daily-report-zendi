@@ -25,7 +25,7 @@ function buildSubscriptionLine(metrics) {
   return `  ${parts.join(' | ')}`;
 }
 
-export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD }) {
+export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD, hoursSettled }) {
   const d = new Date(date);
   const dateStr = d.toLocaleDateString(STORE_LOCALE, {
     day: 'numeric', month: 'long', year: 'numeric',
@@ -68,7 +68,8 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD })
     ...diagnosis.split('\n').map(line => `  ${line}`),
     ``,
     `━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `_Generado automaticamente a las ${REPORT_TIME_LABEL}_`,
+    `_Generado automaticamente a las ${REPORT_TIME_LABEL}` +
+      `${Number.isFinite(hoursSettled) ? ` · Meta: ${hoursSettled.toFixed(1)} h desde el cierre del dia` : ''}_`,
   );
 
   return lines.join('\n');
