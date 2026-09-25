@@ -1,12 +1,12 @@
 import { fetchShopifyOrders, getYesterday } from './shopify.js';
-import { fetchMetaAds, fetchAdAccountTimezone } from './meta.js';
+import { fetchMetaAds, fetchAdAccountInfo } from './meta.js';
 import { hoursSinceDayClose } from './freshness.js';
 import { generateDiagnosis } from './claude.js';
 import { sendToSlack, formatReport } from './slack.js';
 import {
   STORE_NAME, META_ACCESS_TOKEN, SHOPIFY_ACCESS_TOKEN,
   SLACK_WEBHOOK_URL, SUBSCRIPTION_TAGS,
-  META_ACCOUNT_TIMEZONE, MIN_HOURS_AFTER_CLOSE,
+  META_ACCOUNT_TIMEZONE, MIN_HOURS_AFTER_CLOSE, META_AD_ACCOUNTS,
 } from './config.js';
 
 async function fetchExchangeRates() {
@@ -26,20 +26,31 @@ async function fetchExchangeRates() {
 // Meta sigue agregando gasto durante horas despues de que cierra el dia en la
 // timezone de la cuenta. Publicar antes de tiempo subestima el spend, lo que
 // infla ROAS y MER. Preferimos no publicar a publicar cifras incorrectas.
-async function assertMetaDataIsSettled(reportDate) {
-  const timeZone = await fetchAdAccountTimezone(META_ACCESS_TOKEN) || META_ACCOUNT_TIMEZONE;
-  const hours = hoursSinceDayClose(reportDate, timeZone);
+// Con varias cuentas manda la que cerro mas tarde: el total solo esta
+// consolidado cuando lo esta la cuenta mas lenta.
+async function assertMetaDataIsSettled(reportDate, accountInfos) {
+  const checks = META_AD_ACCOUNTS.map((account, i) => {
+    const timeZone = accountInfos[i]?.timeZone || META_ACCOUNT_TIMEZONE;
+    const hours = hoursSinceDayClose(reportDate, timeZone);
+    console.log(
+      `[Freshness] ${account.label}: ${reportDate} cerro hace ${hours.toFixed(2)} h en ${timeZone}`
+    );
+    return { account, timeZone, hours };
+  });
 
+  const slowest = checks.reduce((a, b) => (b.hours < a.hours ? b : a));
+  const { timeZone, hours } = slowest;
   console.log(
-    `[Freshness] ${reportDate} cerro hace ${hours.toFixed(2)} h en ${timeZone} ` +
-    `(minimo requerido: ${MIN_HOURS_AFTER_CLOSE} h)`
+    `[Freshness] Minimo: ${hours.toFixed(2)} h (${slowest.account.label}) — ` +
+    `requerido: ${MIN_HOURS_AFTER_CLOSE} h`
   );
 
   if (hours >= MIN_HOURS_AFTER_CLOSE) return { timeZone, hours };
 
+  const who = checks.length > 1 ? ` (cuenta ${slowest.account.label})` : '';
   const reason = hours < 0
-    ? `el dia todavia no termina en ${timeZone} (faltan ${(-hours).toFixed(1)} h)`
-    : `solo han pasado ${hours.toFixed(1)} h desde el cierre, el minimo es ${MIN_HOURS_AFTER_CLOSE} h`;
+    ? `el dia todavia no termina en ${timeZone}${who} (faltan ${(-hours).toFixed(1)} h)`
+    : `solo han pasado ${hours.toFixed(1)} h desde el cierre${who}, el minimo es ${MIN_HOURS_AFTER_CLOSE} h`;
 
   console.error(`Datos de Meta sin consolidar: ${reason}`);
   await sendToSlack(SLACK_WEBHOOK_URL,
@@ -51,16 +62,51 @@ async function assertMetaDataIsSettled(reportDate) {
   process.exit(1);
 }
 
+// Sumar gasto de cuentas en monedas distintas da un total inventado. Si una
+// cuenta no se pudo leer solo avisamos: la moneda de una cuenta de Meta no se
+// puede cambiar, asi que una vez verificada no hay riesgo real.
+async function assertSameCurrency(reportDate, accountInfos) {
+  if (META_AD_ACCOUNTS.length < 2) return;
+
+  const known = META_AD_ACCOUNTS
+    .map((account, i) => ({ account, currency: accountInfos[i]?.currency }))
+    .filter(a => a.currency);
+  if (known.length < META_AD_ACCOUNTS.length) {
+    console.warn('[Currency] No se pudo leer la moneda de todas las cuentas — se asume la misma');
+  }
+
+  const currencies = new Set(known.map(a => a.currency));
+  console.log(`[Currency] ${known.map(a => `${a.account.label}: ${a.currency}`).join(', ')}`);
+  if (currencies.size <= 1) return;
+
+  const detail = known.map(a => `${a.account.label} = ${a.currency}`).join(', ');
+  console.error(`Cuentas de Meta en monedas distintas: ${detail}`);
+  await sendToSlack(SLACK_WEBHOOK_URL,
+    `:warning: *${STORE_NAME} — Reporte Diario NO publicado*\n${reportDate}\n\n` +
+    `Las cuentas de Meta estan en monedas distintas (${detail}).\n` +
+    `No se publica el reporte porque sumar el gasto daria un total incorrecto.`
+  );
+  process.exit(1);
+}
+
 async function run() {
   const yesterday = getYesterday();
-  const { hours: hoursSettled } = await assertMetaDataIsSettled(yesterday);
+  const accountInfos = await Promise.all(
+    META_AD_ACCOUNTS.map(a => fetchAdAccountInfo(META_ACCESS_TOKEN, a.id))
+  );
+  await assertSameCurrency(yesterday, accountInfos);
+  const { hours: hoursSettled } = await assertMetaDataIsSettled(yesterday, accountInfos);
   let metaData, shopifyData;
 
+  // Si falla una sola cuenta falla todo: un total parcial publicado como si
+  // fuera completo es peor que no publicar.
   try {
-    [metaData, shopifyData] = await Promise.all([
-      fetchMetaAds(META_ACCESS_TOKEN, yesterday),
+    let metaByAccount;
+    [metaByAccount, shopifyData] = await Promise.all([
+      Promise.all(META_AD_ACCOUNTS.map(a => fetchMetaAds(META_ACCESS_TOKEN, yesterday, a))),
       fetchShopifyOrders(SHOPIFY_ACCESS_TOKEN),
     ]);
+    metaData = metaByAccount.flat();
   } catch (err) {
     console.error('API fetch failed:', err.message);
     await sendToSlack(SLACK_WEBHOOK_URL,
@@ -80,9 +126,9 @@ async function run() {
     process.exit(1);
   }
 
-  const metrics = calculateMetrics(metaData, shopifyData);
   const { mxn: eurToMxn, usd: eurToUsd } = await fetchExchangeRates();
   console.log(`[FX] EUR→MXN rate: ${eurToMxn}, EUR→USD rate: ${eurToUsd}`);
+  const metrics = calculateMetrics(metaData, shopifyData, eurToMxn);
   const adSpendUSD = metrics.adSpend * eurToUsd;
 
   const subDebug = metrics.subscriptionCounts.map(s => `${s.label}: ${s.count}`).join(', ');
@@ -123,7 +169,9 @@ function hasTag(row, tag) {
   return tags.includes(tag);
 }
 
-function calculateMetrics(metaRows, shopifyRows) {
+// Shopify liquida en MXN y las cuentas de Meta gastan en EUR: el revenue se
+// pasa a EUR antes de dividir, o el MER sale inflado por el tipo de cambio.
+function calculateMetrics(metaRows, shopifyRows, eurToMxn) {
   const adSpend = sum(metaRows, 'spend');
   const impressions = sum(metaRows, 'impressions');
   const clicks = sum(metaRows, 'clicks');
@@ -143,7 +191,7 @@ function calculateMetrics(metaRows, shopifyRows) {
   const shopifyRevenue = sum(shopifyRows, 'order_net_sales');
   const shopifyOrders = sum(shopifyRows, 'order_count');
   const shopifyAOV = shopifyOrders > 0 ? shopifyRevenue / shopifyOrders : 0;
-  const merROAS = adSpend > 0 ? shopifyRevenue / adSpend : 0;
+  const merROAS = adSpend > 0 ? (shopifyRevenue / eurToMxn) / adSpend : 0;
 
   const orderRows = shopifyRows.filter(r => Number(r.order_count) > 0);
   const subscriptionCounts = SUBSCRIPTION_TAGS.map(({ tag, label }) => ({
@@ -151,12 +199,26 @@ function calculateMetrics(metaRows, shopifyRows) {
     count: orderRows.filter(r => hasTag(r, tag)).length,
   }));
 
+  // Desglose por cuenta, en el orden de META_AD_ACCOUNTS. Una cuenta sin gasto
+  // ese dia no devuelve filas y sale en cero.
+  const byAccount = META_AD_ACCOUNTS.map(({ label }) => {
+    const rows = metaRows.filter(r => r.account === label);
+    const spend = sum(rows, 'spend');
+    const attributed = sum(rows, 'action_values_offsite_conversion_fb_pixel_purchase');
+    return {
+      label,
+      spend,
+      metaOrders: sum(rows, 'actions_offsite_conversion_fb_pixel_purchase'),
+      metaROAS: spend > 0 ? attributed / spend : 0,
+    };
+  });
+
   return {
     adSpend, impressions, clicks, linkClicks, addToCarts,
     checkoutsInitiated, metaOrders, metaAttributedRevenue,
     metaROAS, cpo, ctr, addToCartRate, checkoutRate, purchaseRate,
     shopifyRevenue, shopifyOrders, shopifyAOV, merROAS,
-    subscriptionCounts,
+    subscriptionCounts, byAccount,
   };
 }
 

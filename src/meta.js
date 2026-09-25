@@ -1,4 +1,4 @@
-import { META_AD_ACCOUNT_ID, META_API_VERSION } from './config.js';
+import { META_API_VERSION } from './config.js';
 
 const ACTION_MAP = {
   'link_click': 'actions_link_click',
@@ -27,31 +27,35 @@ function extractActions(actionsArray, map) {
   return result;
 }
 
-// Timezone de la cuenta publicitaria. Define cuando cierra el dia para Meta,
-// que es lo que determina si el gasto ya esta consolidado.
+// Timezone y moneda de una cuenta publicitaria. La timezone define cuando cierra
+// el dia para Meta (y por tanto cuando el gasto esta consolidado); la moneda
+// dice si el gasto de varias cuentas se puede sumar tal cual.
 // Devuelve null si no se pudo leer, para que el llamador use su fallback.
-export async function fetchAdAccountTimezone(accessToken) {
+export async function fetchAdAccountInfo(accessToken, accountId) {
   const params = new URLSearchParams({
     access_token: accessToken,
-    fields: 'timezone_name',
+    fields: 'timezone_name,currency',
   });
-  const url = `https://graph.facebook.com/${META_API_VERSION}/act_${META_AD_ACCOUNT_ID}?${params}`;
+  const url = `https://graph.facebook.com/${META_API_VERSION}/act_${accountId}?${params}`;
 
   try {
     const res = await fetch(url);
     if (!res.ok) {
-      console.warn(`[Meta] No se pudo leer la timezone de la cuenta: ${res.status}`);
+      console.warn(`[Meta] No se pudo leer la cuenta act_${accountId}: ${res.status}`);
       return null;
     }
     const json = await res.json();
-    return json.timezone_name || null;
+    return {
+      timeZone: json.timezone_name || null,
+      currency: json.currency || null,
+    };
   } catch (err) {
-    console.warn(`[Meta] No se pudo leer la timezone de la cuenta: ${err.message}`);
+    console.warn(`[Meta] No se pudo leer la cuenta act_${accountId}: ${err.message}`);
     return null;
   }
 }
 
-export async function fetchMetaAds(accessToken, date) {
+export async function fetchMetaAds(accessToken, date, account) {
   const fields = 'spend,impressions,clicks,actions,action_values,cpc,cpm,ctr,frequency';
   const params = new URLSearchParams({
     access_token: accessToken,
@@ -60,33 +64,34 @@ export async function fetchMetaAds(accessToken, date) {
     fields,
   });
 
-  const url = `https://graph.facebook.com/${META_API_VERSION}/act_${META_AD_ACCOUNT_ID}/insights?${params}`;
+  const url = `https://graph.facebook.com/${META_API_VERSION}/act_${account.id}/insights?${params}`;
 
-  console.log(`[Meta] Fetching ad insights...`);
+  console.log(`[Meta] Fetching ad insights for ${account.label} (act_${account.id})...`);
   const res = await fetch(url);
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Meta API error: ${res.status} ${res.statusText} — ${body.substring(0, 200)}`);
+    throw new Error(`Meta API error (${account.label}): ${res.status} ${res.statusText} — ${body.substring(0, 200)}`);
   }
 
   const json = await res.json();
 
   if (json.error) {
-    throw new Error(`Meta API error: ${json.error.message}`);
+    throw new Error(`Meta API error (${account.label}): ${json.error.message}`);
   }
 
   const data = json.data || [];
-  console.log(`[Meta] Got ${data.length} rows`);
+  console.log(`[Meta] ${account.label}: ${data.length} rows`);
 
   if (data.length > 0) {
     const rawSpend = data.reduce((s, r) => s + (parseFloat(r.spend) || 0), 0);
-    console.log(`[Meta] Raw spend for ${date}: ${rawSpend.toFixed(2)}`);
+    console.log(`[Meta] ${account.label} raw spend for ${date}: ${rawSpend.toFixed(2)}`);
   }
 
   if (data.length === 0) return [];
 
   return data.map(row => ({
+    account: account.label,
     date: row.date_start,
     spend: parseFloat(row.spend) || 0,
     impressions: parseInt(row.impressions) || 0,

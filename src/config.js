@@ -34,9 +34,37 @@ function parseSubscriptionTags(raw) {
   }
 }
 
+// Lista de cuentas de Meta a sumar en el reporte. Sin META_AD_ACCOUNTS se usa
+// solo META_AD_ACCOUNT_ID, asi las tiendas de una sola cuenta no cambian nada.
+// Un JSON invalido aborta: ignorarlo reportaria solo una parte del gasto.
+function parseAdAccounts(raw, fallbackId) {
+  if (!raw) return [{ id: fallbackId, label: 'Meta' }];
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    console.error('META_AD_ACCOUNTS no es JSON valido');
+    process.exit(1);
+  }
+  const accounts = Array.isArray(parsed)
+    ? parsed.filter(a => a && a.id && a.label).map(a => ({ id: String(a.id), label: a.label }))
+    : [];
+  if (accounts.length === 0 || accounts.length !== parsed.length) {
+    console.error('META_AD_ACCOUNTS debe ser una lista de {"id","label"} sin entradas vacias');
+    process.exit(1);
+  }
+  // El desglose agrupa filas por label; dos iguales mezclarian sus cifras.
+  if (new Set(accounts.map(a => a.label)).size !== accounts.length) {
+    console.error('META_AD_ACCOUNTS tiene labels repetidos');
+    process.exit(1);
+  }
+  return accounts;
+}
+
 export const STORE_NAME = required('STORE_NAME');
 export const META_ACCESS_TOKEN = required('META_ACCESS_TOKEN');
 export const META_AD_ACCOUNT_ID = required('META_AD_ACCOUNT_ID');
+export const META_AD_ACCOUNTS = parseAdAccounts(optional('META_AD_ACCOUNTS'), META_AD_ACCOUNT_ID);
 export const SHOPIFY_STORE_DOMAIN = required('SHOPIFY_STORE_DOMAIN');
 export const SHOPIFY_ACCESS_TOKEN = required('SHOPIFY_ACCESS_TOKEN');
 export const ANTHROPIC_API_KEY = required('ANTHROPIC_API_KEY');

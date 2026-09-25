@@ -46,6 +46,18 @@ El ID numerico de tu cuenta de anuncios de Meta (sin el prefijo `act_`).
 4. Copia el **Account ID** (solo los numeros, sin `act_`)
 - Ejemplo: `2217973965310655`
 
+**Varias cuentas:** si la tienda anuncia desde mas de una cuenta, lista todas en
+la variable `META_AD_ACCOUNTS` del workflow (no es secreto):
+
+```yaml
+META_AD_ACCOUNTS: '[{"id":"${{ secrets.META_AD_ACCOUNT_ID }}","label":"MX 1"},{"id":"1823395738216717","label":"MX 2"}]'
+```
+
+El reporte suma el gasto y muestra una linea por cuenta. El usuario del sistema
+del token debe tener asignada cada cuenta. Todas deben estar en la misma moneda;
+si no, el reporte no se publica. La guarda de frescura espera a la cuenta que
+cierra el dia mas tarde.
+
 ### `SHOPIFY_STORE_DOMAIN`
 El dominio `.myshopify.com` de tu tienda.
 

@@ -15,6 +15,14 @@ function buildRoasInstruction() {
   return '2. Compara el ROAS Meta vs MER-ROAS — si hay discrepancia grande, que significa. Evalua si el MER-ROAS es bueno para ecommerce DTC';
 }
 
+function buildAccountLines(metrics) {
+  if (!metrics.byAccount || metrics.byAccount.length < 2) return '';
+  const lines = metrics.byAccount
+    .map(a => `- ${a.label}: gasto €${a.spend.toFixed(2)}, ROAS ${a.metaROAS.toFixed(2)}x, ${a.metaOrders} compras`)
+    .join('\n');
+  return `\n\nDESGLOSE POR CUENTA DE META (las cifras de arriba son la suma):\n${lines}`;
+}
+
 export async function generateDiagnosis(metrics, eurToMxn) {
   const client = new Anthropic();
 
@@ -37,7 +45,7 @@ METRICAS PAID (Meta Ads):
 - CTR: ${metrics.ctr.toFixed(2)}%
 - Add to Cart Rate: ${metrics.addToCartRate.toFixed(2)}%
 - Checkout Rate: ${metrics.checkoutRate.toFixed(2)}%
-- Purchase Rate: ${metrics.purchaseRate.toFixed(2)}%
+- Purchase Rate: ${metrics.purchaseRate.toFixed(2)}%${buildAccountLines(metrics)}
 
 METRICAS SHOPIFY (fuente de verdad):
 - Revenue neto: €${(metrics.shopifyRevenue / eurToMxn).toFixed(2)}

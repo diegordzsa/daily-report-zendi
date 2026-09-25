@@ -37,9 +37,14 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
           # --- Opcionales ---
-          # La cuenta de Meta (Zendi MX 1) cierra el dia a las 00:00 America/Mexico_City
-          # = 06:00 UTC = 08:00 Madrid. Por debajo de MIN_HOURS_AFTER_CLOSE el gasto
-          # todavia no esta consolidado y el reporte no se publica.
+          # Cuentas de Meta que se suman en el reporte (con desglose por cuenta).
+          # Deben estar en la misma moneda: si no, el reporte no se publica.
+          META_AD_ACCOUNTS: '[{"id":"${{ secrets.META_AD_ACCOUNT_ID }}","label":"MX 1"},{"id":"1823395738216717","label":"MX 2"}]'
+          # Zendi MX 1 cierra el dia a las 00:00 America/Mexico_City = 06:00 UTC =
+          # 08:00 Madrid. Con varias cuentas manda la que cierra mas tarde (la
+          # timezone real se lee de la API; esta es solo el fallback). Por debajo de
+          # MIN_HOURS_AFTER_CLOSE el gasto todavia no esta consolidado y el reporte
+          # no se publica.
           META_ACCOUNT_TIMEZONE: 'America/Mexico_City'
           MIN_HOURS_AFTER_CLOSE: '3'
           REPORT_TIME_LABEL: '11:00 (Madrid)'

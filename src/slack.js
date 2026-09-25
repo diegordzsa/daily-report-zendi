@@ -25,6 +25,14 @@ function buildSubscriptionLine(metrics) {
   return `  ${parts.join(' | ')}`;
 }
 
+// Una linea por cuenta de Meta; con una sola cuenta no aporta nada y se omite.
+function buildAccountLines(metrics, eur) {
+  if (!metrics.byAccount || metrics.byAccount.length < 2) return [];
+  return metrics.byAccount.map(a =>
+    `  └ ${a.label}: ${eur(a.spend)} · ROAS ${a.metaROAS.toFixed(2)}x · ${a.metaOrders} compras`
+  );
+}
+
 export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD, hoursSettled }) {
   const d = new Date(date);
   const dateStr = d.toLocaleDateString(STORE_LOCALE, {
@@ -56,6 +64,7 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD, h
     `  Gasto: ${eur(metrics.adSpend)}${adSpendUSD ? ` ($${fmt(adSpendUSD)} USD)` : ''}`,
     `  ROAS: ${metrics.metaROAS.toFixed(2)}x | MER-ROAS: ${metrics.merROAS.toFixed(2)}x | CPO: ${eur(metrics.cpo)}`,
     `  Revenue atribuido: ${eur(metrics.metaAttributedRevenue)}`,
+    ...buildAccountLines(metrics, eur),
     ``,
     `:mag: *FUNNEL*`,
     `  Impresiones: ${fmtInt(metrics.impressions)}`,
