@@ -1,14 +1,14 @@
 name: Meta Account Probe
 
-# Temporal y de SOLO LECTURA. Imprime nombre, timezone, moneda y una muestra de
-# gasto de las dos cuentas de Meta, para decidir como conectar la segunda al
-# reporte diario. NO envia nada a Slack y NO afecta al reporte.
+# Temporal y de SOLO LECTURA. Imprime la moneda y la timezone de cada cuenta de
+# Meta y de la tienda de Shopify, para decidir como conectar la segunda cuenta
+# al reporte diario. NO envia nada a Slack y NO afecta al reporte.
 #
-# Sirve para tres cosas a la vez:
-#   1. Confirmar que el META_ACCESS_TOKEN actual tambien alcanza la cuenta nueva.
-#   2. Leer la moneda de cada cuenta (si difieren, sumar el gasto seria falso).
-#   3. Leer la timezone de cada cuenta (define cuando cierra el dia y por tanto
-#      cuando el gasto esta consolidado).
+# Sirve para cuatro cosas:
+#   1. Confirmar que el META_ACCESS_TOKEN alcanza la cuenta nueva.
+#   2. Leer la moneda de cada cuenta de Meta.
+#   3. Leer la timezone de cada cuenta (define cuando cierra el dia).
+#   4. Leer la moneda de Shopify, para saber si el MER mezcla divisas.
 #
 # Borrar este workflow cuando la segunda cuenta este conectada.
 
@@ -26,35 +26,51 @@ jobs:
       META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
       CURRENT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
       NEW_ID: ${{ github.event.inputs.new_ad_account_id }}
+      SHOPIFY_STORE_DOMAIN: ${{ secrets.SHOPIFY_STORE_DOMAIN }}
+      SHOPIFY_ACCESS_TOKEN: ${{ secrets.SHOPIFY_ACCESS_TOKEN }}
     steps:
-      - name: Metadatos y muestra de gasto de ambas cuentas
+      - name: Cuentas de Meta — moneda y timezone
         run: |
-          YESTERDAY=$(date -u -d 'yesterday' +%F)
-          echo "Dia de muestra: ${YESTERDAY}"
-          echo
-
           probe_account () {
             label="$1"
             id="$2"
             echo "=================================================="
             echo "  ${label}  (act_${id})"
             echo "=================================================="
-
-            echo "--- Metadatos de la cuenta ---"
             curl -s -G "https://graph.facebook.com/v21.0/act_${id}" \
               --data-urlencode "access_token=${META_ACCESS_TOKEN}" \
-              --data-urlencode "fields=name,timezone_name,timezone_offset_hours_utc,currency,account_status" \
-              | jq '.'
-
-            echo "--- Insights de ${YESTERDAY} ---"
-            curl -s -G "https://graph.facebook.com/v21.0/act_${id}/insights" \
-              --data-urlencode "access_token=${META_ACCESS_TOKEN}" \
-              --data-urlencode "time_range={\"since\":\"${YESTERDAY}\",\"until\":\"${YESTERDAY}\"}" \
-              --data-urlencode "level=account" \
-              --data-urlencode "fields=spend,impressions,clicks,actions,action_values" \
+              --data-urlencode "fields=name,timezone_name,currency,account_status" \
               | jq '.'
             echo
           }
 
           probe_account "CUENTA ACTUAL" "${CURRENT_ID}"
           probe_account "CUENTA NUEVA"  "${NEW_ID}"
+
+      - name: Shopify — moneda de la tienda
+        run: |
+          echo "=================================================="
+          echo "  SHOPIFY — tienda"
+          echo "=================================================="
+          # `currency` es la moneda en que la tienda liquida y en la que vienen
+          # los importes de la Admin API, que es lo que el reporte suma.
+          # El `else .` deja ver el error crudo si la llamada falla.
+          curl -s "https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/shop.json" \
+            -H "X-Shopify-Access-Token: ${SHOPIFY_ACCESS_TOKEN}" \
+            | jq 'if .shop then {name: .shop.name, currency: .shop.currency, money_format: .shop.money_format, iana_timezone: .shop.iana_timezone} else . end'
+          echo
+
+      - name: Shopify — moneda real de unas ordenes
+        run: |
+          echo "=================================================="
+          echo "  SHOPIFY — ultimas 3 ordenes"
+          echo "=================================================="
+          # Confirmacion independiente: el campo `currency` de ordenes reales.
+          # Manda este, porque `subtotal_price` + `total_tax` es exactamente lo
+          # que report.js suma en `order_net_sales`.
+          curl -s -G "https://${SHOPIFY_STORE_DOMAIN}/admin/api/2024-10/orders.json" \
+            -H "X-Shopify-Access-Token: ${SHOPIFY_ACCESS_TOKEN}" \
+            --data-urlencode "status=any" \
+            --data-urlencode "limit=3" \
+            --data-urlencode "fields=id,created_at,currency,total_price,subtotal_price,total_tax" \
+            | jq 'if .orders then [.orders[] | {created_at, currency, subtotal_price, total_tax, total_price}] else . end'
