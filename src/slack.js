@@ -25,12 +25,19 @@ function buildSubscriptionLine(metrics) {
   return `  ${parts.join(' | ')}`;
 }
 
-// Una linea por cuenta de Meta; con una sola cuenta no aporta nada y se omite.
-function buildAccountLines(metrics, eur) {
+// Seccion propia por cuenta de Meta, para que el gasto y ROAS de cada una se
+// lean de un vistazo. Con una sola cuenta repetiria el total y se omite.
+function buildAccountSection(metrics, eur) {
   if (!metrics.byAccount || metrics.byAccount.length < 2) return [];
-  return metrics.byAccount.map(a =>
-    `  └ ${a.label}: ${eur(a.spend)} · ROAS ${a.metaROAS.toFixed(2)}x · ${a.metaOrders} compras`
-  );
+  const lines = [``, `:dart: *GASTO Y ROAS POR CUENTA*`];
+  for (const a of metrics.byAccount) {
+    lines.push(
+      `  *${a.label}*`,
+      `    Gasto: *${eur(a.spend)}* | ROAS: *${a.metaROAS.toFixed(2)}x*`,
+      `    Compras: ${a.metaOrders} | CPO: ${eur(a.cpo)}`,
+    );
+  }
+  return lines;
 }
 
 export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD, hoursSettled }) {
@@ -60,11 +67,11 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD, h
 
   lines.push(
     ``,
-    `:loudspeaker: *PAID ADS (Meta)*`,
+    `:loudspeaker: *PAID ADS (Meta)${metrics.byAccount?.length > 1 ? ' — Total cuentas' : ''}*`,
     `  Gasto: ${eur(metrics.adSpend)}${adSpendUSD ? ` ($${fmt(adSpendUSD)} USD)` : ''}`,
     `  ROAS: ${metrics.metaROAS.toFixed(2)}x | MER-ROAS: ${metrics.merROAS.toFixed(2)}x | CPO: ${eur(metrics.cpo)}`,
     `  Revenue atribuido: ${eur(metrics.metaAttributedRevenue)}`,
-    ...buildAccountLines(metrics, eur),
+    ...buildAccountSection(metrics, eur),
     ``,
     `:mag: *FUNNEL*`,
     `  Impresiones: ${fmtInt(metrics.impressions)}`,

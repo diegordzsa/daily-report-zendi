@@ -205,11 +205,13 @@ function calculateMetrics(metaRows, shopifyRows, eurToMxn) {
     const rows = metaRows.filter(r => r.account === label);
     const spend = sum(rows, 'spend');
     const attributed = sum(rows, 'action_values_offsite_conversion_fb_pixel_purchase');
+    const orders = sum(rows, 'actions_offsite_conversion_fb_pixel_purchase');
     return {
       label,
       spend,
-      metaOrders: sum(rows, 'actions_offsite_conversion_fb_pixel_purchase'),
+      metaOrders: orders,
       metaROAS: spend > 0 ? attributed / spend : 0,
+      cpo: orders > 0 ? spend / orders : 0,
     };
   });
 
