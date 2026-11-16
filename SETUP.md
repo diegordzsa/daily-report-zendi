@@ -75,6 +75,7 @@ Credenciales de una Custom App de Shopify con acceso a la Admin API.
 2. Crea una nueva app (Custom App)
 3. En **API credentials**, configura los scopes de Admin API:
    - `read_orders` (requerido)
+   - `read_reports` (para la seccion "Conversion tienda": % carrito, checkout y conversion como en Shopify Analytics; sin el, esa seccion sale como "No disponible")
 4. Instala la app en tu tienda
 5. Copia el **Client ID** y **Client Secret** de la seccion de credenciales
 

@@ -1,4 +1,4 @@
-import { fetchShopifyOrders, getYesterday } from './shopify.js';
+import { fetchShopifyOrders, fetchShopifyFunnel, getYesterday } from './shopify.js';
 import { fetchMetaAds, fetchAdAccountInfo } from './meta.js';
 import { hoursSinceDayClose } from './freshness.js';
 import { generateDiagnosis } from './claude.js';
@@ -96,15 +96,16 @@ async function run() {
   );
   await assertSameCurrency(yesterday, accountInfos);
   const { hours: hoursSettled } = await assertMetaDataIsSettled(yesterday, accountInfos);
-  let metaData, shopifyData;
+  let metaData, shopifyData, shopifyFunnel;
 
   // Si falla una sola cuenta falla todo: un total parcial publicado como si
   // fuera completo es peor que no publicar.
   try {
     let metaByAccount;
-    [metaByAccount, shopifyData] = await Promise.all([
+    [metaByAccount, shopifyData, shopifyFunnel] = await Promise.all([
       Promise.all(META_AD_ACCOUNTS.map(a => fetchMetaAds(META_ACCESS_TOKEN, yesterday, a))),
       fetchShopifyOrders(SHOPIFY_ACCESS_TOKEN),
+      fetchShopifyFunnel(SHOPIFY_ACCESS_TOKEN, yesterday),
     ]);
     metaData = metaByAccount.flat();
   } catch (err) {
@@ -129,6 +130,7 @@ async function run() {
   const { mxn: eurToMxn, usd: eurToUsd } = await fetchExchangeRates();
   console.log(`[FX] EUR→MXN rate: ${eurToMxn}, EUR→USD rate: ${eurToUsd}`);
   const metrics = calculateMetrics(metaData, shopifyData, eurToMxn);
+  metrics.shopifyFunnel = shopifyFunnel;
   const adSpendUSD = metrics.adSpend * eurToUsd;
 
   const subDebug = metrics.subscriptionCounts.map(s => `${s.label}: ${s.count}`).join(', ');

@@ -1,4 +1,4 @@
-import { SHOPIFY_STORE_DOMAIN, SHOPIFY_API_VERSION } from './config.js';
+import { SHOPIFY_STORE_DOMAIN, SHOPIFY_API_VERSION, SHOPIFY_ANALYTICS_API_VERSION } from './config.js';
 
 export function getYesterday() {
   if (process.env.REPORT_DATE) return process.env.REPORT_DATE;
@@ -61,4 +61,54 @@ export async function fetchShopifyOrders(accessToken) {
       order_tags: order.tags || '',
     };
   });
+}
+
+// Embudo de la tienda tal como lo muestra Shopify Analytics (Sesiones →
+// carrito → checkout → compra). Las tasas son sobre sesiones, igual que en el
+// admin, y el dia se corta en la timezone de la tienda. Requiere el scope
+// read_reports y una version de API con shopifyqlQuery (2025-10+).
+// Devuelve null si falla: el embudo es informativo y no debe tumbar el reporte.
+export async function fetchShopifyFunnel(accessToken, date) {
+  const query = `FROM sessions SHOW sessions, sessions_with_cart_additions, ` +
+    `sessions_that_reached_checkout, sessions_that_completed_checkout, ` +
+    `added_to_cart_rate, reached_checkout_rate, conversion_rate ` +
+    `SINCE ${date} UNTIL ${date}`;
+  const gql = `query($q: String!) { shopifyqlQuery(query: $q) { tableData { rows } parseErrors } }`;
+
+  try {
+    const res = await fetch(
+      `https://${SHOPIFY_STORE_DOMAIN}/admin/api/${SHOPIFY_ANALYTICS_API_VERSION}/graphql.json`,
+      {
+        method: 'POST',
+        headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: gql, variables: { q: query } }),
+      }
+    );
+    const json = await res.json().catch(() => ({}));
+    const result = json.data?.shopifyqlQuery;
+    if (!res.ok || json.errors || !result) {
+      const detail = json.errors ? JSON.stringify(json.errors).substring(0, 200) : `${res.status} ${res.statusText}`;
+      throw new Error(detail);
+    }
+    if (result.parseErrors?.length) throw new Error(`ShopifyQL: ${result.parseErrors.join('; ')}`);
+
+    const row = result.tableData?.rows?.[0] || {};
+    const n = (k) => Number(row[k]) || 0;
+    const funnel = {
+      sessions: n('sessions'),
+      cartSessions: n('sessions_with_cart_additions'),
+      checkoutSessions: n('sessions_that_reached_checkout'),
+      convertedSessions: n('sessions_that_completed_checkout'),
+      addToCartRate: n('added_to_cart_rate') * 100,
+      reachedCheckoutRate: n('reached_checkout_rate') * 100,
+      conversionRate: n('conversion_rate') * 100,
+    };
+    console.log(`[Shopify] Funnel ${date}: ${funnel.sessions} sesiones, ` +
+      `ATC ${funnel.addToCartRate.toFixed(2)}%, checkout ${funnel.reachedCheckoutRate.toFixed(2)}%, ` +
+      `CVR ${funnel.conversionRate.toFixed(2)}%`);
+    return funnel;
+  } catch (err) {
+    console.warn(`[Shopify] No se pudo leer el embudo de sesiones (¿falta scope read_reports?): ${err.message}`);
+    return null;
+  }
 }

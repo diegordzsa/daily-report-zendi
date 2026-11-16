@@ -40,6 +40,24 @@ function buildAccountSection(metrics, eur) {
   return lines;
 }
 
+// Embudo de la tienda (todas las sesiones, no solo trafico de Meta), con las
+// mismas tasas que Shopify Analytics. Si no se pudo leer se avisa en vez de
+// omitirlo, para que no parezca que desaparecio sin razon.
+function buildStoreFunnelSection(funnel) {
+  const lines = [``, `:shopping_trolley: *CONVERSION TIENDA (Shopify)*`];
+  if (!funnel) {
+    lines.push(`  _No disponible — revisar scope read_reports del token de Shopify_`);
+    return lines;
+  }
+  lines.push(
+    `  Sesiones: ${fmtInt(funnel.sessions)}`,
+    `  Añadido al carrito: *${funnel.addToCartRate.toFixed(2)}%* (${fmtInt(funnel.cartSessions)})`,
+    `  Llegaron al checkout: *${funnel.reachedCheckoutRate.toFixed(2)}%* (${fmtInt(funnel.checkoutSessions)})`,
+    `  Conversion: *${funnel.conversionRate.toFixed(2)}%* (${fmtInt(funnel.convertedSessions)})`,
+  );
+  return lines;
+}
+
 export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD, hoursSettled }) {
   const d = new Date(date);
   const dateStr = d.toLocaleDateString(STORE_LOCALE, {
@@ -72,8 +90,9 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD, h
     `  ROAS: ${metrics.metaROAS.toFixed(2)}x | MER-ROAS: ${metrics.merROAS.toFixed(2)}x | CPO: ${eur(metrics.cpo)}`,
     `  Revenue atribuido: ${eur(metrics.metaAttributedRevenue)}`,
     ...buildAccountSection(metrics, eur),
+    ...buildStoreFunnelSection(metrics.shopifyFunnel),
     ``,
-    `:mag: *FUNNEL*`,
+    `:mag: *FUNNEL (Meta)*`,
     `  Impresiones: ${fmtInt(metrics.impressions)}`,
     `  Link Clicks: ${fmtInt(metrics.linkClicks)} (CTR: ${metrics.ctr.toFixed(1)}%)`,
     `  Add to Cart: ${metrics.addToCarts} (${metrics.addToCartRate.toFixed(1)}%)`,

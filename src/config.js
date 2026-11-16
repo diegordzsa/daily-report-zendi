@@ -84,5 +84,7 @@ export const MIN_HOURS_AFTER_CLOSE = optionalNumber('MIN_HOURS_AFTER_CLOSE', 3);
 export const REPORT_TIME_LABEL = optional('REPORT_TIME_LABEL', '9:00 AM');
 export const META_API_VERSION = optional('META_API_VERSION', 'v21.0');
 export const SHOPIFY_API_VERSION = optional('SHOPIFY_API_VERSION', '2024-10');
+// shopifyqlQuery (embudo de sesiones) solo existe en la Admin GraphQL API 2025-10+.
+export const SHOPIFY_ANALYTICS_API_VERSION = optional('SHOPIFY_ANALYTICS_API_VERSION', '2025-10');
 export const CLAUDE_MODEL = optional('CLAUDE_MODEL', 'claude-sonnet-4-6');
 export const SUBSCRIPTION_TAGS = parseSubscriptionTags(optional('SUBSCRIPTION_TAGS'));

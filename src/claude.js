@@ -23,6 +23,18 @@ function buildAccountLines(metrics) {
   return `\n\nDESGLOSE POR CUENTA DE META (las cifras de arriba son la suma):\n${lines}`;
 }
 
+function buildStoreFunnelLines(metrics) {
+  const f = metrics.shopifyFunnel;
+  if (!f) return '';
+  return `
+
+EMBUDO DE LA TIENDA (Shopify Analytics, todas las sesiones):
+- Sesiones: ${f.sessions}
+- Tasa de añadido al carrito: ${f.addToCartRate.toFixed(2)}%
+- Tasa de llegada al checkout: ${f.reachedCheckoutRate.toFixed(2)}%
+- Tasa de conversion: ${f.conversionRate.toFixed(2)}%`;
+}
+
 export async function generateDiagnosis(metrics, eurToMxn) {
   const client = new Anthropic();
 
@@ -50,7 +62,7 @@ METRICAS PAID (Meta Ads):
 METRICAS SHOPIFY (fuente de verdad):
 - Revenue neto: €${(metrics.shopifyRevenue / eurToMxn).toFixed(2)}
 - Ordenes reales: ${metrics.shopifyOrders}
-- AOV: €${(metrics.shopifyAOV / eurToMxn).toFixed(2)}${subscriptionSection}
+- AOV: €${(metrics.shopifyAOV / eurToMxn).toFixed(2)}${subscriptionSection}${buildStoreFunnelLines(metrics)}
 
 Identifica en 3-4 lineas:
 1. Cual es el punto mas debil del funnel hoy y por que
