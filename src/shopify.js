@@ -63,37 +63,41 @@ export async function fetchShopifyOrders(accessToken) {
   });
 }
 
+// Ejecuta una consulta ShopifyQL (Shopify Analytics) y devuelve la primera fila
+// con sus valores como numeros. Requiere el scope read_reports y una version de
+// API con shopifyqlQuery (2025-10+). Lanza error si falla.
+async function runShopifyQL(accessToken, query) {
+  const gql = `query($q: String!) { shopifyqlQuery(query: $q) { tableData { rows } parseErrors } }`;
+  const res = await fetch(
+    `https://${SHOPIFY_STORE_DOMAIN}/admin/api/${SHOPIFY_ANALYTICS_API_VERSION}/graphql.json`,
+    {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: gql, variables: { q: query } }),
+    }
+  );
+  const json = await res.json().catch(() => ({}));
+  const result = json.data?.shopifyqlQuery;
+  if (!res.ok || json.errors || !result) {
+    const detail = json.errors ? JSON.stringify(json.errors).substring(0, 200) : `${res.status} ${res.statusText}`;
+    throw new Error(detail);
+  }
+  if (result.parseErrors?.length) throw new Error(`ShopifyQL: ${result.parseErrors.join('; ')}`);
+  const row = result.tableData?.rows?.[0] || {};
+  return (k) => Number(row[k]) || 0;
+}
+
 // Embudo de la tienda tal como lo muestra Shopify Analytics (Sesiones →
 // carrito → checkout → compra). Las tasas son sobre sesiones, igual que en el
-// admin, y el dia se corta en la timezone de la tienda. Requiere el scope
-// read_reports y una version de API con shopifyqlQuery (2025-10+).
+// admin, y el dia se corta en la timezone de la tienda.
 // Devuelve null si falla: el embudo es informativo y no debe tumbar el reporte.
 export async function fetchShopifyFunnel(accessToken, date) {
-  const query = `FROM sessions SHOW sessions, sessions_with_cart_additions, ` +
-    `sessions_that_reached_checkout, sessions_that_completed_checkout, ` +
-    `added_to_cart_rate, reached_checkout_rate, conversion_rate ` +
-    `SINCE ${date} UNTIL ${date}`;
-  const gql = `query($q: String!) { shopifyqlQuery(query: $q) { tableData { rows } parseErrors } }`;
-
   try {
-    const res = await fetch(
-      `https://${SHOPIFY_STORE_DOMAIN}/admin/api/${SHOPIFY_ANALYTICS_API_VERSION}/graphql.json`,
-      {
-        method: 'POST',
-        headers: { 'X-Shopify-Access-Token': accessToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: gql, variables: { q: query } }),
-      }
-    );
-    const json = await res.json().catch(() => ({}));
-    const result = json.data?.shopifyqlQuery;
-    if (!res.ok || json.errors || !result) {
-      const detail = json.errors ? JSON.stringify(json.errors).substring(0, 200) : `${res.status} ${res.statusText}`;
-      throw new Error(detail);
-    }
-    if (result.parseErrors?.length) throw new Error(`ShopifyQL: ${result.parseErrors.join('; ')}`);
-
-    const row = result.tableData?.rows?.[0] || {};
-    const n = (k) => Number(row[k]) || 0;
+    const n = await runShopifyQL(accessToken,
+      `FROM sessions SHOW sessions, sessions_with_cart_additions, ` +
+      `sessions_that_reached_checkout, sessions_that_completed_checkout, ` +
+      `added_to_cart_rate, reached_checkout_rate, conversion_rate ` +
+      `SINCE ${date} UNTIL ${date}`);
     const funnel = {
       sessions: n('sessions'),
       cartSessions: n('sessions_with_cart_additions'),
@@ -109,6 +113,21 @@ export async function fetchShopifyFunnel(accessToken, date) {
     return funnel;
   } catch (err) {
     console.warn(`[Shopify] No se pudo leer el embudo de sesiones (¿falta scope read_reports?): ${err.message}`);
+    return null;
+  }
+}
+
+// Clientes que compraron por primera vez ese dia, segun Shopify Analytics.
+// Es la base del CAC. Devuelve null si falla.
+export async function fetchShopifyNewCustomers(accessToken, date) {
+  try {
+    const n = await runShopifyQL(accessToken,
+      `FROM sales SHOW new_customers, returning_customers SINCE ${date} UNTIL ${date}`);
+    const result = { newCustomers: n('new_customers'), returningCustomers: n('returning_customers') };
+    console.log(`[Shopify] Clientes ${date}: ${result.newCustomers} nuevos, ${result.returningCustomers} recurrentes`);
+    return result;
+  } catch (err) {
+    console.warn(`[Shopify] No se pudieron leer los clientes nuevos (¿falta scope read_reports?): ${err.message}`);
     return null;
   }
 }

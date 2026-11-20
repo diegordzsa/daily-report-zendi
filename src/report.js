@@ -1,4 +1,4 @@
-import { fetchShopifyOrders, fetchShopifyFunnel, getYesterday } from './shopify.js';
+import { fetchShopifyOrders, fetchShopifyFunnel, fetchShopifyNewCustomers, getYesterday } from './shopify.js';
 import { fetchMetaAds, fetchAdAccountInfo } from './meta.js';
 import { hoursSinceDayClose } from './freshness.js';
 import { generateDiagnosis } from './claude.js';
@@ -7,6 +7,7 @@ import {
   STORE_NAME, META_ACCESS_TOKEN, SHOPIFY_ACCESS_TOKEN,
   SLACK_WEBHOOK_URL, SUBSCRIPTION_TAGS,
   META_ACCOUNT_TIMEZONE, MIN_HOURS_AFTER_CLOSE, META_AD_ACCOUNTS,
+  RECURRING_ORDER_TAG,
 } from './config.js';
 
 async function fetchExchangeRates() {
@@ -96,16 +97,17 @@ async function run() {
   );
   await assertSameCurrency(yesterday, accountInfos);
   const { hours: hoursSettled } = await assertMetaDataIsSettled(yesterday, accountInfos);
-  let metaData, shopifyData, shopifyFunnel;
+  let metaData, shopifyData, shopifyFunnel, shopifyCustomers;
 
   // Si falla una sola cuenta falla todo: un total parcial publicado como si
   // fuera completo es peor que no publicar.
   try {
     let metaByAccount;
-    [metaByAccount, shopifyData, shopifyFunnel] = await Promise.all([
+    [metaByAccount, shopifyData, shopifyFunnel, shopifyCustomers] = await Promise.all([
       Promise.all(META_AD_ACCOUNTS.map(a => fetchMetaAds(META_ACCESS_TOKEN, yesterday, a))),
       fetchShopifyOrders(SHOPIFY_ACCESS_TOKEN),
       fetchShopifyFunnel(SHOPIFY_ACCESS_TOKEN, yesterday),
+      fetchShopifyNewCustomers(SHOPIFY_ACCESS_TOKEN, yesterday),
     ]);
     metaData = metaByAccount.flat();
   } catch (err) {
@@ -129,7 +131,7 @@ async function run() {
 
   const { mxn: eurToMxn, usd: eurToUsd } = await fetchExchangeRates();
   console.log(`[FX] EUR→MXN rate: ${eurToMxn}, EUR→USD rate: ${eurToUsd}`);
-  const metrics = calculateMetrics(metaData, shopifyData, eurToMxn);
+  const metrics = calculateMetrics(metaData, shopifyData, eurToMxn, shopifyCustomers);
   metrics.shopifyFunnel = shopifyFunnel;
   const adSpendUSD = metrics.adSpend * eurToUsd;
 
@@ -173,7 +175,7 @@ function hasTag(row, tag) {
 
 // Shopify liquida en MXN y las cuentas de Meta gastan en EUR: el revenue se
 // pasa a EUR antes de dividir, o el MER sale inflado por el tipo de cambio.
-function calculateMetrics(metaRows, shopifyRows, eurToMxn) {
+function calculateMetrics(metaRows, shopifyRows, eurToMxn, shopifyCustomers) {
   const adSpend = sum(metaRows, 'spend');
   const impressions = sum(metaRows, 'impressions');
   const clicks = sum(metaRows, 'clicks');
@@ -201,6 +203,23 @@ function calculateMetrics(metaRows, shopifyRows, eurToMxn) {
     count: orderRows.filter(r => hasTag(r, tag)).length,
   }));
 
+  // Primera compra: todo menos las renovaciones de suscripcion, que llegan
+  // solas y no las genera el gasto del dia. Revenue en MXN, MER en EUR/EUR.
+  let firstPurchase = null;
+  if (RECURRING_ORDER_TAG) {
+    const rows = orderRows.filter(r => !hasTag(r, RECURRING_ORDER_TAG));
+    const revenue = sum(rows, 'order_net_sales');
+    firstPurchase = {
+      revenue,
+      orders: sum(rows, 'order_count'),
+      mer: adSpend > 0 ? (revenue / eurToMxn) / adSpend : 0,
+    };
+  }
+
+  // CAC = gasto total / clientes que compraron por primera vez ese dia.
+  const newCustomers = shopifyCustomers ? shopifyCustomers.newCustomers : null;
+  const cac = newCustomers > 0 ? adSpend / newCustomers : null;
+
   // Desglose por cuenta, en el orden de META_AD_ACCOUNTS. Una cuenta sin gasto
   // ese dia no devuelve filas y sale en cero.
   const byAccount = META_AD_ACCOUNTS.map(({ label }) => {
@@ -222,7 +241,7 @@ function calculateMetrics(metaRows, shopifyRows, eurToMxn) {
     checkoutsInitiated, metaOrders, metaAttributedRevenue,
     metaROAS, cpo, ctr, addToCartRate, checkoutRate, purchaseRate,
     shopifyRevenue, shopifyOrders, shopifyAOV, merROAS,
-    subscriptionCounts, byAccount,
+    subscriptionCounts, byAccount, firstPurchase, newCustomers, cac,
   };
 }
 

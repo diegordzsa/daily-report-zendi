@@ -88,3 +88,7 @@ export const SHOPIFY_API_VERSION = optional('SHOPIFY_API_VERSION', '2024-10');
 export const SHOPIFY_ANALYTICS_API_VERSION = optional('SHOPIFY_ANALYTICS_API_VERSION', '2025-10');
 export const CLAUDE_MODEL = optional('CLAUDE_MODEL', 'claude-sonnet-4-6');
 export const SUBSCRIPTION_TAGS = parseSubscriptionTags(optional('SUBSCRIPTION_TAGS'));
+// Tag de las ordenes de renovacion de suscripcion. Esas ordenes no las genera el
+// gasto del dia, asi que se excluyen para medir la primera compra. Vacio = no
+// se calcula la seccion de ventas sin recurrentes.
+export const RECURRING_ORDER_TAG = optional('RECURRING_ORDER_TAG');

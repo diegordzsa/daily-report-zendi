@@ -52,5 +52,7 @@ jobs:
           STORE_INDUSTRY: 'suplementos DTC'
           ROAS_BENCHMARK: '2.0x-4.0x'
           SUBSCRIPTION_TAGS: '[{"tag":"Kaching Subscription First Order","label":"1ª Susc"},{"tag":"Kaching Subscription Recurring Order","label":"Recurrentes"}]'
+          # Ordenes de renovacion: se excluyen en la seccion "Primera compra".
+          RECURRING_ORDER_TAG: 'Kaching Subscription Recurring Order'
           REPORT_DATE: ${{ github.event.inputs.report_date }}
         run: node src/report.js

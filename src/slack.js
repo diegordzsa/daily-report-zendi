@@ -58,6 +58,27 @@ function buildStoreFunnelSection(funnel) {
   return lines;
 }
 
+// Primera compra: lo que el gasto del dia realmente trajo, sin las renovaciones
+// de suscripcion (que llegan solas) y medido con Shopify, no con la atribucion
+// de Meta (que con varias cuentas y view-through cuenta de mas).
+function buildFirstPurchaseSection(metrics, eur, fromMxn) {
+  const { firstPurchase, newCustomers, cac } = metrics;
+  if (!firstPurchase && newCustomers === undefined) return [];
+  const lines = [``, `:sparkles: *PRIMERA COMPRA (Shopify, sin recurrentes)*`];
+  if (firstPurchase) {
+    lines.push(
+      `  Ventas: ${fromMxn(firstPurchase.revenue)} ($${fmt(firstPurchase.revenue)} MXN) | Ordenes: ${firstPurchase.orders}`,
+      `  MER primera compra: *${firstPurchase.mer.toFixed(2)}x*`,
+    );
+  }
+  if (newCustomers === null) {
+    lines.push(`  Clientes nuevos: _no disponible — revisar scope read_reports_`);
+  } else {
+    lines.push(`  Clientes nuevos: ${newCustomers} | CAC: *${cac === null ? '—' : eur(cac)}*`);
+  }
+  return lines;
+}
+
 export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD, hoursSettled }) {
   const d = new Date(date);
   const dateStr = d.toLocaleDateString(STORE_LOCALE, {
@@ -89,6 +110,7 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD, h
     `  Gasto: ${eur(metrics.adSpend)}${adSpendUSD ? ` ($${fmt(adSpendUSD)} USD)` : ''}`,
     `  ROAS: ${metrics.metaROAS.toFixed(2)}x | MER-ROAS: ${metrics.merROAS.toFixed(2)}x | CPO: ${eur(metrics.cpo)}`,
     `  Revenue atribuido: ${eur(metrics.metaAttributedRevenue)}`,
+    ...buildFirstPurchaseSection(metrics, eur, fromMxn),
     ...buildAccountSection(metrics, eur),
     ...buildStoreFunnelSection(metrics.shopifyFunnel),
     ``,

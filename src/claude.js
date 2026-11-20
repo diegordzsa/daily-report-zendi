@@ -35,6 +35,29 @@ EMBUDO DE LA TIENDA (Shopify Analytics, todas las sesiones):
 - Tasa de conversion: ${f.conversionRate.toFixed(2)}%`;
 }
 
+function buildFirstPurchaseLines(metrics, eurToMxn) {
+  const lines = [];
+  if (metrics.firstPurchase) {
+    lines.push(
+      `- Revenue sin renovaciones de suscripcion: €${(metrics.firstPurchase.revenue / eurToMxn).toFixed(2)} (${metrics.firstPurchase.orders} ordenes)`,
+      `- MER primera compra: ${metrics.firstPurchase.mer.toFixed(2)}x`,
+    );
+  }
+  if (metrics.newCustomers !== null && metrics.newCustomers !== undefined) {
+    lines.push(`- Clientes nuevos: ${metrics.newCustomers}${metrics.cac !== null ? ` (CAC €${metrics.cac.toFixed(2)})` : ''}`);
+  }
+  return lines.length ? `\n\nPRIMERA COMPRA (Shopify, sin recurrentes):\n${lines.join('\n')}` : '';
+}
+
+// Slack usa *negrita* (un asterisco); el **doble** de markdown sale literal.
+// Se convierte por si el modelo lo usa igual, y se quitan los # de titulos.
+function toSlackMarkdown(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '*$1*')
+    .replace(/__(.+?)__/g, '_$1_')
+    .replace(/^#{1,6}\s+/gm, '');
+}
+
 export async function generateDiagnosis(metrics, eurToMxn) {
   const client = new Anthropic();
 
@@ -62,20 +85,25 @@ METRICAS PAID (Meta Ads):
 METRICAS SHOPIFY (fuente de verdad):
 - Revenue neto: €${(metrics.shopifyRevenue / eurToMxn).toFixed(2)}
 - Ordenes reales: ${metrics.shopifyOrders}
-- AOV: €${(metrics.shopifyAOV / eurToMxn).toFixed(2)}${subscriptionSection}${buildStoreFunnelLines(metrics)}
+- AOV: €${(metrics.shopifyAOV / eurToMxn).toFixed(2)}${subscriptionSection}${buildStoreFunnelLines(metrics)}${buildFirstPurchaseLines(metrics, eurToMxn)}
 
 Identifica en 3-4 lineas:
 1. Cual es el punto mas debil del funnel hoy y por que
 ${buildRoasInstruction()}
 3. Una accion concreta que se deberia tomar hoy
 
-Responde en espanol, directo, sin introducciones.`;
+Responde en espanol, directo, sin introducciones, en maximo 120 palabras.
+Formato Slack: para negrita usa *un asterisco* (nunca **), sin titulos con #.`;
 
   const message = await client.messages.create({
     model: CLAUDE_MODEL,
-    max_tokens: 300,
+    // Holgado a proposito: con 300 el texto se cortaba a media frase.
+    max_tokens: 800,
     messages: [{ role: 'user', content: prompt }],
   });
 
-  return message.content[0].text;
+  if (message.stop_reason === 'max_tokens') {
+    console.warn('[Claude] El diagnostico llego al limite de tokens y puede estar cortado');
+  }
+  return toSlackMarkdown(message.content[0].text);
 }
