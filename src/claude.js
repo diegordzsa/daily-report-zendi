@@ -46,7 +46,14 @@ function buildFirstPurchaseLines(metrics, eurToMxn) {
   if (metrics.newCustomers !== null && metrics.newCustomers !== undefined) {
     lines.push(`- Clientes nuevos: ${metrics.newCustomers}${metrics.cac !== null ? ` (CAC €${metrics.cac.toFixed(2)})` : ''}`);
   }
-  return lines.length ? `\n\nPRIMERA COMPRA (Shopify, sin recurrentes):\n${lines.join('\n')}` : '';
+  if (!lines.length) return '';
+  // Sin esta aclaracion el modelo mezclaba ordenes totales (con renovaciones)
+  // con sesiones de la tienda y sacaba tasas de conversion sin sentido.
+  return `\n\nPRIMERA COMPRA (Shopify, sin recurrentes):\n${lines.join('\n')}
+NOTA: las ordenes recurrentes son renovaciones automaticas de suscripcion: no
+pasan por la tienda ni las genera el gasto del dia. No las compares con sesiones
+ni con el embudo. Para evaluar la adquisicion pagada usa el MER primera compra y
+el CAC; el MER-ROAS total incluye renovaciones y se ve mejor de lo que es.`;
 }
 
 // Slack usa *negrita* (un asterisco); el **doble** de markdown sale literal.
