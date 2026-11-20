@@ -1,6 +1,14 @@
 import { STORE_NAME, STORE_LOCALE, REPORT_TIME_LABEL, SUBSCRIPTION_TAGS } from './config.js';
 
 export async function sendToSlack(webhookUrl, reportText) {
+  // Modo ensayo: el reporte se imprime en el log y no se manda al canal, para
+  // probar cambios sin publicar un reporte duplicado.
+  if (process.env.DRY_RUN === 'true') {
+    console.log('\n===== DRY RUN — mensaje que se enviaria a Slack =====\n');
+    console.log(reportText);
+    console.log('\n===== FIN DRY RUN =====\n');
+    return;
+  }
   const res = await fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
