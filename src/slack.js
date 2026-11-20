@@ -137,6 +137,15 @@ export function formatReport({ date, metrics, diagnosis, eurToMxn, adSpendUSD, h
       `${Number.isFinite(hoursSettled) ? ` · Meta: ${hoursSettled.toFixed(1)} h desde el cierre del dia` : ''}_`,
   );
 
+  // Mensaje de prueba: se publica en el canal real pero marcado, para que nadie
+  // lo tome por el reporte oficial del dia.
+  if (process.env.REPORT_IS_TEST === 'true') {
+    lines.unshift(
+      `:test_tube: *MENSAJE DE PRUEBA — nuevo formato pendiente de aprobacion. No es el reporte oficial.*`,
+      ``,
+    );
+  }
+
   return lines.join('\n');
 }
 

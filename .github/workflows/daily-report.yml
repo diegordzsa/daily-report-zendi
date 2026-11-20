@@ -14,6 +14,10 @@ on:
         description: 'Modo ensayo: imprime el reporte en el log en vez de mandarlo a Slack'
         type: boolean
         default: false
+      test_message:
+        description: 'Mensaje de prueba: se manda a Slack marcado como PRUEBA'
+        type: boolean
+        default: false
 
 jobs:
   report:
@@ -60,4 +64,5 @@ jobs:
           RECURRING_ORDER_TAG: 'Kaching Subscription Recurring Order'
           REPORT_DATE: ${{ github.event.inputs.report_date }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
+          REPORT_IS_TEST: ${{ github.event.inputs.test_message }}
         run: node src/report.js
